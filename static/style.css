@@ -1,0 +1,36 @@
+body {
+  font-family: Arial;
+  text-align: center;
+  background: #0f172a;
+  color: white;
+}
+
+button {
+  padding: 10px 20px;
+  margin: 10px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.start {
+  background: #22c55e;
+}
+.stop {
+  background: #ef4444;
+}
+
+#video {
+  margin-top: 20px;
+  border-radius: 10px;
+  width: 700px;
+}
+
+#dashboard {
+  margin-top: 20px;
+  background: #1e293b;
+  padding: 15px;
+  border-radius: 10px;
+  display: inline-block;
+}

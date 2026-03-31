@@ -1,0 +1,46 @@
+<!doctype html>
+<html>
+  <head>
+    <title>AI Object Detection</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+
+  <body>
+    <h1>🚀 Real-Time Object Detection</h1>
+
+    <button class="start" onclick="startCamera()">Start</button>
+    <button class="stop" onclick="stopCamera()">Stop</button>
+
+    <br />
+
+    <img id="video" src="/video" />
+
+    <div id="dashboard">
+      <h3>📊 Object Counts</h3>
+      <ul id="counts"></ul>
+    </div>
+
+    <script>
+      function startCamera() {
+        fetch("/start");
+      }
+
+      function stopCamera() {
+        fetch("/stop");
+      }
+
+      // Fetch counts every 1 sec
+      setInterval(() => {
+        fetch("/counts")
+          .then((res) => res.json())
+          .then((data) => {
+            let html = "";
+            for (let key in data) {
+              html += `<li>${key}: ${data[key]}</li>`;
+            }
+            document.getElementById("counts").innerHTML = html;
+          });
+      }, 1000);
+    </script>
+  </body>
+</html>
