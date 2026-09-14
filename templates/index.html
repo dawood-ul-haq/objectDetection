@@ -1,48 +1,345 @@
 <!doctype html>
-<html>
-  <head>
-    <title>AI Object Detection</title>
-    <link rel="stylesheet" href="/static/style.css" />
-  </head>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <body>
-    <h1>🚀 Real-Time Object Detection</h1>
+  <title>AI Object Detection</title>
 
-    <button class="start" onclick="startCamera()">Start</button>
-    <button class="stop" onclick="stopCamera()">Stop</button>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
 
-    <br />
+<body>
 
-    <img id="video" src="/video" />
+  <div class="container">
 
-    <div id="dashboard">
-      <h3>📊 Object Counts</h3>
-      <ul id="counts"></ul>
-    </div>
+    <header>
+      <div class="badge">AI • COMPUTER VISION</div>
 
-    <script>
-      function startCamera() {
-        fetch("/start");
-      }
+      <h1>🚀 Real-Time Object Detection</h1>
 
-      function stopCamera() {
-        fetch("/stop");
-      }
+      <p>
+        Detect and count objects in real time using
+        <strong>YOLOv8</strong>, OpenCV and Flask.
+      </p>
+    </header>
 
-      // Fetch counts every 1 sec
-      setInterval(() => {
-        fetch("/counts")
-          .then((res) => res.json())
-          .then((data) => {
-            let html = "";
-            for (let key in data) {
-              html += `<li>${key}: ${data[key]}</li>`;
+
+    <section class="controls">
+
+      <button class="start" onclick="startCamera()">
+        ▶ Start Detection
+      </button>
+
+      <button class="stop" onclick="stopCamera()">
+        ■ Stop Detection
+      </button>
+
+      <span id="status" class="status stopped">
+        ● Stopped
+      </span>
+
+    </section>
+
+
+    <section class="main-card">
+
+      <div class="video-section">
+
+        <div class="section-title">
+          <span>📷 Detection Output</span>
+          <span id="processing">Ready</span>
+        </div>
+
+        <img
+          id="video"
+          alt="Detection output"
+        >
+
+        <video
+          id="camera"
+          autoplay
+          playsinline
+          style="display: none;"
+        ></video>
+
+        <canvas
+          id="canvas"
+          style="display: none;"
+        ></canvas>
+
+      </div>
+
+
+      <div class="dashboard">
+
+        <div class="dashboard-header">
+          <h2>📊 Object Counts</h2>
+          <span id="objectCount">0 objects</span>
+        </div>
+
+        <ul id="counts">
+          <li class="empty">
+            Start detection to see objects
+          </li>
+        </ul>
+
+      </div>
+
+    </section>
+
+
+    <footer>
+      <span>YOLOv8</span>
+      <span>•</span>
+      <span>OpenCV</span>
+      <span>•</span>
+      <span>Flask</span>
+    </footer>
+
+  </div>
+
+
+<script>
+
+  let stream = null;
+  let detecting = false;
+  let previousImageUrl = null;
+
+  const camera = document.getElementById("camera");
+  const canvas = document.getElementById("canvas");
+  const output = document.getElementById("video");
+
+  const countsList = document.getElementById("counts");
+  const status = document.getElementById("status");
+  const processing = document.getElementById("processing");
+  const objectCount = document.getElementById("objectCount");
+
+
+  async function startCamera() {
+
+    if (detecting) {
+      return;
+    }
+
+    try {
+
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false
+      });
+
+      camera.srcObject = stream;
+
+      detecting = true;
+
+      status.textContent = "● Running";
+      status.className = "status running";
+
+      processing.textContent = "Detecting...";
+
+      detectFrame();
+
+    } catch (error) {
+
+      console.error(error);
+
+      alert(
+        "Unable to access your camera. Please allow camera permission and try again."
+      );
+    }
+  }
+
+
+  function stopCamera() {
+
+    detecting = false;
+
+    if (stream) {
+
+      stream.getTracks().forEach(track => track.stop());
+
+      stream = null;
+    }
+
+    camera.srcObject = null;
+
+    output.src = "";
+
+    if (previousImageUrl) {
+
+      URL.revokeObjectURL(previousImageUrl);
+
+      previousImageUrl = null;
+    }
+
+    status.textContent = "● Stopped";
+    status.className = "status stopped";
+
+    processing.textContent = "Ready";
+
+    objectCount.textContent = "0 objects";
+
+    countsList.innerHTML =
+      '<li class="empty">Start detection to see objects</li>';
+  }
+
+
+  async function detectFrame() {
+
+    if (!detecting) {
+      return;
+    }
+
+
+    if (camera.readyState < 2) {
+
+      requestAnimationFrame(detectFrame);
+
+      return;
+    }
+
+
+    canvas.width = camera.videoWidth;
+    canvas.height = camera.videoHeight;
+
+
+    const context = canvas.getContext("2d");
+
+    context.drawImage(
+      camera,
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
+
+
+    canvas.toBlob(
+      async function(blob) {
+
+        if (!blob || !detecting) {
+          return;
+        }
+
+
+        const formData = new FormData();
+
+        formData.append(
+          "frame",
+          blob,
+          "frame.jpg"
+        );
+
+
+        try {
+
+          const response = await fetch(
+            "/detect",
+            {
+              method: "POST",
+              body: formData
             }
-            document.getElementById("counts").innerHTML = html;
-          });
-      }, 1000);
-    </script>
-  </body>
-</html>
+          );
 
-<!-- asugfhjvsaf -->
+
+          if (!response.ok) {
+            throw new Error("Detection request failed");
+          }
+
+
+          const data = await response.json();
+
+
+          const byteCharacters =
+            data.image.match(/.{1,2}/g);
+
+
+          const byteArray =
+            new Uint8Array(
+              byteCharacters.map(
+                byte => parseInt(byte, 16)
+              )
+            );
+
+
+          const imageBlob =
+            new Blob(
+              [byteArray],
+              { type: "image/jpeg" }
+            );
+
+
+          const imageUrl =
+            URL.createObjectURL(imageBlob);
+
+
+          output.src = imageUrl;
+
+
+          if (previousImageUrl) {
+            URL.revokeObjectURL(previousImageUrl);
+          }
+
+          previousImageUrl = imageUrl;
+
+
+          let html = "";
+          let totalObjects = 0;
+
+
+          for (const key in data.counts) {
+
+            const count = data.counts[key];
+
+            totalObjects += count;
+
+            html += `
+              <li>
+                <span>${key}</span>
+                <strong>${count}</strong>
+              </li>
+            `;
+          }
+
+
+          countsList.innerHTML =
+            html ||
+            '<li class="empty">No objects detected</li>';
+
+
+          objectCount.textContent =
+            totalObjects +
+            (totalObjects === 1 ? " object" : " objects");
+
+
+          processing.textContent =
+            "Live detection";
+
+        } catch (error) {
+
+          console.error(error);
+
+          processing.textContent =
+            "Connection error";
+        }
+
+
+        if (detecting) {
+
+          setTimeout(
+            detectFrame,
+            100
+          );
+        }
+
+      },
+      "image/jpeg",
+      0.7
+    );
+  }
+
+</script>
+
+</body>
+</html>
